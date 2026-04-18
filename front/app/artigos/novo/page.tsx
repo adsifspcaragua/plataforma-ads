@@ -30,7 +30,7 @@ export default function NovoArtigoPage() {
   const [newTag, setNewTag] = useState('')
 
   const [uploadingCover, setUploadingCover] = useState(false)
-  const [savingAs, setSavingAs] = useState<'rascunho' | 'publicado' | null>(null)
+  const [savingAs, setSavingAs] = useState<'rascunho' | 'pendente' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
@@ -88,7 +88,7 @@ export default function NovoArtigoPage() {
     setTags((prev) => prev.filter((t) => t !== tag))
   }
 
-  async function save(status: 'rascunho' | 'publicado') {
+  async function save(status: 'rascunho' | 'pendente') {
     if (!formRef.current?.reportValidity()) return
     if (!userId) return
 
@@ -105,7 +105,7 @@ export default function NovoArtigoPage() {
         content,
         cover_image_url: coverUrl || null,
         status,
-        published_at: status === 'publicado' ? new Date().toISOString() : null,
+        published_at: null,
       })
       .select('id')
       .single()
@@ -273,10 +273,10 @@ export default function NovoArtigoPage() {
             <button
               type="button"
               disabled={!!savingAs || uploadingCover}
-              onClick={() => save('publicado')}
+              onClick={() => save('pendente')}
               className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 transition"
             >
-              {savingAs === 'publicado' ? 'Publicando...' : 'Publicar'}
+              {savingAs === 'pendente' ? 'Enviando...' : 'Enviar para revisão'}
             </button>
           </div>
 
