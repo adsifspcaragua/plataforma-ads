@@ -1,0 +1,93 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+
+type Option = { value: string; label: string }
+
+type Props = {
+  value: string
+  onChange: (value: string) => void
+  options: Option[]
+  placeholder?: string
+  className?: string
+}
+
+export default function Select({ value, onChange, options, placeholder, className }: Props) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  const selected = options.find((o) => o.value === value)
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  function pick(val: string) {
+    onChange(val)
+    setOpen(false)
+  }
+
+  return (
+    <div ref={ref} className={`relative ${className ?? ''}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white pl-3 pr-2.5 py-2 text-sm text-left outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 transition"
+      >
+        <span className={selected ? 'text-zinc-700 truncate' : 'text-zinc-400'}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <svg
+          className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1 w-full min-w-max rounded-xl border border-zinc-200 bg-white shadow-lg py-1 max-h-60 overflow-y-auto">
+          {placeholder !== undefined && (
+            <button
+              type="button"
+              onClick={() => pick('')}
+              className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                value === ''
+                  ? 'text-zinc-900 font-medium bg-zinc-50'
+                  : 'text-zinc-400 hover:bg-zinc-50'
+              }`}
+            >
+              {placeholder}
+            </button>
+          )}
+          {options.map((opt) => {
+            const active = opt.value === value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => pick(opt.value)}
+                className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm transition-colors ${
+                  active ? 'text-zinc-900 font-medium bg-zinc-50' : 'text-zinc-700 hover:bg-zinc-50'
+                }`}
+              >
+                {opt.label}
+                {active && (
+                  <svg className="h-3.5 w-3.5 shrink-0 text-zinc-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}

@@ -179,7 +179,19 @@ export default function PerfilPage() {
   return (
     <div className="min-h-screen bg-zinc-50 py-12 px-4">
       <div className="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-sm border border-zinc-200 p-8">
-        <h1 className="text-2xl font-semibold text-zinc-900 mb-1">Meu perfil</h1>
+        <div className="flex items-center justify-between mb-1">
+          <h1 className="text-2xl font-semibold text-zinc-900">Meu perfil</h1>
+          <button
+            type="button"
+            onClick={async () => {
+              await supabase.auth.signOut()
+              router.push('/login')
+            }}
+            className="text-sm text-zinc-400 hover:text-red-600 transition"
+          >
+            Sair
+          </button>
+        </div>
         <p className="text-sm text-zinc-500 mb-6">Personalize suas informações</p>
 
         <form onSubmit={handleSave} className="flex flex-col gap-4">

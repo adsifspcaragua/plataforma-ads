@@ -51,11 +51,11 @@ export default function NovoProjetoPage() {
 
     if (data.images.length > 0) {
       await supabase.from('project_images').insert(
-        data.images.map((img, i) => ({ project_id: project.id, image_url: img.url, display_order: i }))
+        data.images.map((img, i) => ({ project_id: project.id, image_url: img.url, display_order: i, media_type: img.type }))
       )
     }
 
-    router.push('/projetos')
+    router.push('/meus-projetos')
   }
 
   if (!userId) return null
@@ -74,7 +74,7 @@ export default function NovoProjetoPage() {
           userId={userId}
           saving={saving}
           onSave={handleSave}
-          onCancel={() => router.push('/projetos')}
+          onCancel={() => router.push('/meus-projetos')}
         />
       </div>
     </div>

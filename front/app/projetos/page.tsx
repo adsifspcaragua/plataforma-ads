@@ -1,160 +1,138 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import Image from 'next/image'
+import Link from 'next/link'
 import { supabase } from '@/app/lib/supabase'
+import ProjectFilters from '@/app/components/ProjectFilters'
 
-type Project = {
-  id: string
-  title: string
-  description: string
-  repo_url: string | null
-  deploy_url: string | null
-  semester: number | null
-  is_featured: boolean
-  created_at: string
-  project_tags: { tag_name: string }[]
-  project_images: { image_url: string; display_order: number }[]
-}
+export default async function ProjetosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tag?: string; semester?: string; aluno?: string }>
+}) {
+  const { tag, semester, aluno } = await searchParams
 
-export default function ProjetosPage() {
-  const router = useRouter()
-  const [projects, setProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-
-      const { data } = await supabase
-        .from('projects')
-        .select('id, title, description, repo_url, deploy_url, semester, is_featured, created_at, project_tags(tag_name), project_images(image_url, display_order)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-
-      setProjects(data ?? [])
-      setLoading(false)
-    }
-    load()
-  }, [router])
-
-  async function handleDelete(id: string, title: string) {
-    if (!confirm(`Excluir "${title}"? Esta ação não pode ser desfeita.`)) return
-
-    setDeletingId(id)
-    await supabase.from('projects').delete().eq('id', id)
-    setProjects((prev) => prev.filter((p) => p.id !== id))
-    setDeletingId(null)
+ 
+  let tagProjectIds: string[] | null = null
+  if (tag) {
+    const { data } = await supabase
+      .from('project_tags')
+      .select('project_id')
+      .eq('tag_name', tag)
+    tagProjectIds = data?.map((r) => r.project_id) ?? []
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-sm text-zinc-500">Carregando...</p>
-      </div>
-    )
+  
+  let query = supabase
+    .from('projects')
+    .select('id, title, description, repo_url, deploy_url, semester, is_featured, like_count, created_at, users(id, name, avatar_url), project_tags(tag_name), project_images(image_url, display_order)')
+    .order('created_at', { ascending: false })
+
+  if (tagProjectIds !== null) {
+    query = tagProjectIds.length > 0
+      ? query.in('id', tagProjectIds)
+      : query.in('id', ['00000000-0000-0000-0000-000000000000'])
   }
+  if (semester) query = query.eq('semester', parseInt(semester))
+  if (aluno) query = query.eq('user_id', aluno)
+
+  const [{ data: projects }, { data: tagRows }, { data: semesterRows }, { data: studentRows }] =
+    await Promise.all([
+      query,
+      supabase.from('project_tags').select('tag_name'),
+      supabase.from('projects').select('semester').not('semester', 'is', null),
+      supabase.from('projects').select('user_id, users(id, name)').not('user_id', 'is', null),
+    ])
+
+  const allTags = [...new Set((tagRows ?? []).map((r) => r.tag_name))].sort()
+  const allSemesters = [...new Set((semesterRows ?? []).map((r) => r.semester as number))].sort((a, b) => a - b)
+
+  type StudentRow = { user_id: string; users: { id: string; name: string } | null }
+  const seenIds = new Set<string>()
+  const allStudents = (studentRows as StudentRow[] ?? [])
+    .filter((r) => r.users && !seenIds.has(r.user_id) && seenIds.add(r.user_id))
+    .map((r) => ({ id: r.users!.id, name: r.users!.name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   return (
     <div className="min-h-screen bg-zinc-50 py-12 px-4">
-      <div className="w-full max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
+      <div className="w-full max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-semibold text-zinc-900">Meus projetos</h1>
-            <p className="text-sm text-zinc-500 mt-0.5">{projects.length} projeto{projects.length !== 1 ? 's' : ''}</p>
+            <h1 className="text-2xl font-semibold text-zinc-900">Projetos</h1>
+            <p className="text-sm text-zinc-500 mt-0.5">
+              {projects?.length ?? 0} projeto{(projects?.length ?? 0) !== 1 ? 's' : ''}
+            </p>
           </div>
           <Link
-            href="/projetos/novo"
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition"
+            href="/meus-projetos"
+            className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 transition"
           >
-            Novo projeto
+            Meus projetos
           </Link>
         </div>
 
-        {projects.length === 0 ? (
+        <ProjectFilters tags={allTags} semesters={allSemesters} students={allStudents} />
+
+        {!projects || projects.length === 0 ? (
           <div className="text-center py-20 text-zinc-400">
-            <p className="text-lg mb-2">Nenhum projeto ainda</p>
-            <Link href="/projetos/novo" className="text-sm text-zinc-900 underline">
-              Adicionar o primeiro
-            </Link>
+            <p className="text-lg">Nenhum projeto encontrado.</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {projects.map((project) => {
-              const cover = project.project_images
+              const cover = (project.project_images as { image_url: string; display_order: number }[])
                 .sort((a, b) => a.display_order - b.display_order)[0]
+              const tags = project.project_tags as { tag_name: string }[]
+              const author = project.users as { name: string; avatar_url: string | null } | null
 
               return (
-                <div key={project.id} className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex gap-4 p-4">
-                  {cover ? (
-                    <div className="relative w-24 h-24 rounded-xl overflow-hidden shrink-0">
-                      <Image src={cover.image_url} alt={project.title} fill className="object-cover" />
-                    </div>
-                  ) : (
-                    <div className="w-24 h-24 rounded-xl bg-zinc-100 shrink-0 flex items-center justify-center text-zinc-300 text-2xl">
-                      ◻
-                    </div>
-                  )}
+                <Link
+                  key={project.id}
+                  href={`/projetos/${project.id}`}
+                  className="bg-white rounded-2xl border border-zinc-200 overflow-hidden flex flex-col hover:border-zinc-300 hover:shadow-sm transition"
+                >
+                  <div className="relative h-44 bg-zinc-100">
+                    {cover
+                      ? <Image src={cover.image_url} alt={project.title} fill className="object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center text-zinc-300 text-3xl">◻</div>
+                    }
+                    {project.is_featured && (
+                      <span className="absolute top-2 left-2 rounded-full bg-amber-400 px-2 py-0.5 text-xs font-semibold text-amber-900">
+                        destaque
+                      </span>
+                    )}
+                  </div>
 
-                  <div className="flex flex-col justify-between flex-1 min-w-0">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h2 className="text-sm font-semibold text-zinc-900 truncate">{project.title}</h2>
-                        {project.is_featured && (
-                          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                            destaque
+                  <div className="p-4 flex flex-col gap-2 flex-1">
+                    <h2 className="text-sm font-semibold text-zinc-900">{project.title}</h2>
+                    <p className="text-xs text-zinc-500 line-clamp-2 flex-1">{project.description}</p>
+
+                    {tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {tags.map(({ tag_name }) => (
+                          <span key={tag_name} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
+                            {tag_name}
                           </span>
-                        )}
+                        ))}
                       </div>
-                      <p className="text-xs text-zinc-500 line-clamp-2">{project.description}</p>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        {project.repo_url && (
-                          <a href={project.repo_url} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-400 hover:text-zinc-700 transition">
-                            GitHub ↗
-                          </a>
-                        )}
-                        {project.deploy_url && (
-                          <a href={project.deploy_url} target="_blank" rel="noopener noreferrer" className="text-xs text-zinc-400 hover:text-zinc-700 transition">
-                            Deploy ↗
-                          </a>
-                        )}
+                    )}
+
+                    <div className="flex items-center justify-between mt-1">
+                      <div className="flex items-center gap-2">
+                        {author?.avatar_url
+                          ? <Image src={author.avatar_url} alt={author.name} width={16} height={16} className="rounded-full object-cover" />
+                          : <div className="w-4 h-4 rounded-full bg-zinc-200" />
+                        }
+                        <span className="text-xs text-zinc-400">{author?.name}</span>
                       </div>
-                      {project.project_tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {project.project_tags.map(({ tag_name }) => (
-                            <span key={tag_name} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
-                              {tag_name}
-                            </span>
-                          ))}
-                        </div>
+                      {(project.like_count as number) > 0 && (
+                        <span className="flex items-center gap-1 text-xs text-zinc-400">
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" /></svg>
+                          {project.like_count}
+                        </span>
                       )}
                     </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-xs text-zinc-400">
-                        {new Date(project.created_at).toLocaleDateString('pt-BR')}
-                      </p>
-                      <div className="flex gap-2">
-                        <Link
-                          href={`/projetos/${project.id}/editar`}
-                          className="rounded-lg border border-zinc-200 px-3 py-1 text-xs font-medium text-zinc-600 hover:bg-zinc-50 transition"
-                        >
-                          Editar
-                        </Link>
-                        <button
-                          onClick={() => handleDelete(project.id, project.title)}
-                          disabled={deletingId === project.id}
-                          className="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition"
-                        >
-                          {deletingId === project.id ? 'Excluindo...' : 'Excluir'}
-                        </button>
-                      </div>
-                    </div>
                   </div>
-                </div>
+                </Link>
               )
             })}
           </div>

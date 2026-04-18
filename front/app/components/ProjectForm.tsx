@@ -12,7 +12,7 @@ export type ProjectFormData = {
   semester: string
   is_featured: boolean
   tags: string[]
-  images: { url: string }[]
+  images: { url: string; type: 'image' | 'video' }[]
 }
 
 type Props = {
@@ -32,19 +32,20 @@ export default function ProjectForm({ userId, initial, saving, onSave, onCancel 
   const [isFeatured, setIsFeatured] = useState(initial?.is_featured ?? false)
   const [tags, setTags] = useState<string[]>(initial?.tags ?? [])
   const [newTag, setNewTag] = useState('')
-  const [images, setImages] = useState<{ url: string }[]>(initial?.images ?? [])
-  const [uploadingImages, setUploadingImages] = useState(false)
+  const [images, setImages] = useState<{ url: string; type: 'image' | 'video' }[]>(initial?.images ?? [])
+  const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
 
-  async function handleImagesChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleMediaChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     if (!files.length) return
 
-    setUploadingImages(true)
-    const uploaded: { url: string }[] = []
+    setUploading(true)
+    const uploaded: { url: string; type: 'image' | 'video' }[] = []
 
     for (const file of files) {
+      const isVideo = file.type.startsWith('video/')
       const ext = file.name.split('.').pop()
       const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
 
@@ -54,16 +55,16 @@ export default function ProjectForm({ userId, initial, saving, onSave, onCancel 
 
       if (!error) {
         const { data: { publicUrl } } = supabase.storage.from('project-images').getPublicUrl(path)
-        uploaded.push({ url: publicUrl })
+        uploaded.push({ url: publicUrl, type: isVideo ? 'video' : 'image' })
       }
     }
 
     setImages((prev) => [...prev, ...uploaded])
-    setUploadingImages(false)
+    setUploading(false)
     e.target.value = ''
   }
 
-  function removeImage(index: number) {
+  function removeMedia(index: number) {
     setImages((prev) => prev.filter((_, i) => i !== index))
   }
 
@@ -87,45 +88,46 @@ export default function ProjectForm({ userId, initial, saving, onSave, onCancel 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-6">
 
-     
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-zinc-700">Imagens do projeto</label>
+        <label className="text-sm font-medium text-zinc-700">Imagens e vídeos</label>
         <div className="grid grid-cols-3 gap-2">
-          {images.map((img, i) => (
-            <div key={i} className="relative aspect-video rounded-xl overflow-hidden group">
-              <Image src={img.url} alt="" fill className="object-cover" />
+          {images.map((media, i) => (
+            <div key={i} className="relative aspect-video rounded-xl overflow-hidden group bg-zinc-100">
+              {media.type === 'video' ? (
+                <video src={media.url} className="w-full h-full object-cover" muted loop playsInline />
+              ) : (
+                <Image src={media.url} alt="" fill className="object-cover" />
+              )}
               <button
                 type="button"
-                onClick={() => removeImage(i)}
+                onClick={() => removeMedia(i)}
                 className="absolute top-1 right-1 rounded-full bg-black/60 text-white text-xs w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
               >
                 ×
               </button>
-              {i === 0 && (
-                <span className="absolute bottom-1 left-1 rounded-full bg-black/60 text-white text-xs px-1.5 py-0.5">
-                  capa
-                </span>
-              )}
+              <span className="absolute bottom-1 left-1 rounded-full bg-black/60 text-white text-xs px-1.5 py-0.5">
+                {i === 0 ? 'capa' : media.type === 'video' ? '▶ vídeo' : ''}
+              </span>
             </div>
           ))}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingImages}
+            disabled={uploading}
             className="aspect-video rounded-xl border-2 border-dashed border-zinc-300 flex flex-col items-center justify-center text-zinc-400 hover:border-zinc-400 hover:text-zinc-600 disabled:opacity-50 transition text-xs gap-1"
           >
             <span className="text-2xl leading-none">+</span>
-            <span>{uploadingImages ? 'Enviando...' : 'Adicionar'}</span>
+            <span>{uploading ? 'Enviando...' : 'Adicionar'}</span>
           </button>
         </div>
-        <p className="text-xs text-zinc-400">A primeira imagem é usada como capa.</p>
+        <p className="text-xs text-zinc-400">Aceita imagens e vídeos. O primeiro item é usado como capa.</p>
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
           className="hidden"
-          onChange={handleImagesChange}
+          onChange={handleMediaChange}
         />
       </div>
 
@@ -232,7 +234,7 @@ export default function ProjectForm({ userId, initial, saving, onSave, onCancel 
         )}
         <button
           type="submit"
-          disabled={saving || uploadingImages}
+          disabled={saving || uploading}
           className="ml-auto rounded-lg bg-zinc-900 px-6 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 transition"
         >
           {saving ? 'Salvando...' : 'Salvar projeto'}

@@ -48,7 +48,7 @@ export default function EditarArtigoPage() {
         .eq('user_id', user.id)
         .single()
 
-      if (error || !data) { router.push('/artigos'); return }
+      if (error || !data) { router.push('/meus-artigos'); return }
 
       setTitle(data.title)
       setSlug(data.slug)
@@ -140,7 +140,7 @@ export default function EditarArtigoPage() {
       }
     }
 
-    router.push('/artigos')
+    router.push('/meus-artigos')
   }
 
   if (loading) {
@@ -279,7 +279,7 @@ export default function EditarArtigoPage() {
           <div className="flex items-center justify-between pt-2">
             <button
               type="button"
-              onClick={() => router.push('/artigos')}
+              onClick={() => router.push('/meus-artigos')}
               className="text-sm text-zinc-500 hover:text-zinc-900 transition"
             >
               Cancelar

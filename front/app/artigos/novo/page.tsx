@@ -127,7 +127,7 @@ export default function NovoArtigoPage() {
       }
     }
 
-    router.push('/artigos')
+    router.push('/meus-artigos')
   }
 
   return (
@@ -138,7 +138,7 @@ export default function NovoArtigoPage() {
 
         <form ref={formRef} className="flex flex-col gap-6">
 
-          {/* Capa */}
+       
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium text-zinc-700">Capa</label>
             <div

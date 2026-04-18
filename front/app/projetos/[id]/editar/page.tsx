@@ -21,12 +21,12 @@ export default function EditarProjetoPage() {
 
       const { data, error } = await supabase
         .from('projects')
-        .select('title, description, repo_url, deploy_url, semester, is_featured, project_tags(tag_name), project_images(image_url, display_order)')
+        .select('title, description, repo_url, deploy_url, semester, is_featured, project_tags(tag_name), project_images(image_url, display_order, media_type)')
         .eq('id', id)
         .eq('user_id', user.id)
         .single()
 
-      if (error || !data) { router.push('/projetos'); return }
+      if (error || !data) { router.push('/meus-projetos'); return }
 
       setInitial({
         title: data.title,
@@ -38,7 +38,7 @@ export default function EditarProjetoPage() {
         tags: data.project_tags.map((t: { tag_name: string }) => t.tag_name),
         images: data.project_images
           .sort((a: { display_order: number }, b: { display_order: number }) => a.display_order - b.display_order)
-          .map((img: { image_url: string }) => ({ url: img.image_url })),
+          .map((img: { image_url: string; media_type: string }) => ({ url: img.image_url, type: (img.media_type ?? 'image') as 'image' | 'video' })),
       })
     }
     load()
@@ -78,11 +78,11 @@ export default function EditarProjetoPage() {
     await supabase.from('project_images').delete().eq('project_id', id)
     if (data.images.length > 0) {
       await supabase.from('project_images').insert(
-        data.images.map((img, i) => ({ project_id: id, image_url: img.url, display_order: i }))
+        data.images.map((img, i) => ({ project_id: id, image_url: img.url, display_order: i, media_type: img.type }))
       )
     }
 
-    router.push('/projetos')
+    router.push('/meus-projetos')
   }
 
   if (!initial || !userId) {
@@ -108,7 +108,7 @@ export default function EditarProjetoPage() {
           initial={initial}
           saving={saving}
           onSave={handleSave}
-          onCancel={() => router.push('/projetos')}
+          onCancel={() => router.push('/meus-projetos')}
         />
       </div>
     </div>
